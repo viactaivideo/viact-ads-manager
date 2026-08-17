@@ -43,7 +43,7 @@ The resulting token is a portable string; where it was created does not matter.
 Then open this directory in Claude Code, approve the `google-ads` MCP server,
 and ask Claude to **run `check_connection`**.
 
-## Tools
+## Read tools
 
 | Tool | Purpose |
 |---|---|
@@ -83,12 +83,50 @@ companion field added alongside: `metrics.cost_micros: "45000000"` arrives with
 Values are read from the environment, falling back to `.env` in the repo root.
 `.env` is gitignored.
 
-## Read-only by design
+## Write tools
 
-Every tool issues `SELECT` queries through `googleAds:searchStream`. Nothing here
-creates, edits, or pauses anything — Claude cannot change your spend or your
-campaigns through this server. Mutations would need new tools calling the
-`:mutate` endpoints, which is a deliberate follow-up rather than an accident.
+| Tool | Purpose |
+|---|---|
+| `set_status` | Pause / enable / remove campaigns, ad groups, keywords, ads |
+| `add_negative_keywords` | Block queries at campaign or ad group level |
+| `list_negative_keywords` | Existing negatives with the resource names removal needs |
+| `remove_negative_keywords` | Remove negatives by resource name |
+| `update_campaign_budget` | Change a daily budget |
+| `create_campaign_budget` | Create a budget |
+| `update_bid` | Set a max CPC on an ad group or keyword |
+| `update_bidding_strategy` | Switch bidding strategy, with target CPA / ROAS |
+| `create_campaign` | Create a campaign (defaults to PAUSED) |
+| `create_ad_group` | Create an ad group |
+| `create_responsive_search_ad` | Create an RSA, with length limits checked first |
+| `add_keywords` | Add positive keywords |
+| `upload_offline_conversions` | Upload conversions against recorded clicks |
+
+Money crosses the tool boundary in **account currency**, never micros. Pass
+`175.0`, not `175000000`.
+
+### Preview, then confirm
+
+Every write tool takes `confirm`, defaulting to `false`:
+
+- **`confirm=false`** — the operations go to Google with `validateOnly=true`.
+  Google checks them against the real account and changes nothing. The tool
+  returns the current state, the exact operations, and Google's verdict.
+- **`confirm=true`** — the same payload is applied for real.
+
+Because validation and application send an identical payload, a clean preview
+means the apply behaves the same way. A test asserts every write tool defaults
+to preview, so a tool cannot be added that applies silently.
+
+Two further guards: new campaigns and ad groups default to `PAUSED`, and
+`partialFailure` is off during validation so a bad batch is rejected outright
+rather than reported row by row.
+
+### What is deliberately absent
+
+There are no tools for account-structure deletion beyond `set_status REMOVED`,
+and none for billing or account settings. Two things are missing because the
+API does not expose them: **Auction Insights** (UI only) and **Keyword Planner
+forecasts** (a separate service).
 
 ## Development
 

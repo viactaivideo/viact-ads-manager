@@ -273,14 +273,15 @@ async def test_list_accessible_customers_strips_resource_prefix():
 
 
 @pytest.mark.anyio
-async def test_all_tools_are_registered():
+async def test_read_tools_are_registered():
     from viact_ads import server
 
     names = {tool.name for tool in await server.mcp.list_tools()}
-    assert names == {
+    read_tools = {
         "check_connection",
         "list_accessible_customers",
         "list_managed_accounts",
+        "list_negative_keywords",
         "account_summary",
         "campaign_performance",
         "ad_group_performance",
@@ -289,6 +290,17 @@ async def test_all_tools_are_registered():
         "ad_performance",
         "run_gaql",
     }
+    assert read_tools <= names, read_tools - names
+
+
+@pytest.mark.anyio
+async def test_read_tools_take_no_confirm_argument():
+    """Only write tools gate on confirm; a read tool asking for it is a bug."""
+    from viact_ads import server
+
+    tools = {tool.name: tool for tool in await server.mcp.list_tools()}
+    for name in ("campaign_performance", "search_terms_report", "run_gaql"):
+        assert "confirm" not in tools[name].input_schema["properties"]
 
 
 # --------------------------------------------------------------------------

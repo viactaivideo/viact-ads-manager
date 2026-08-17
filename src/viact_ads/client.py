@@ -153,6 +153,91 @@ class GoogleAdsClient:
         return rows
 
 
+    async def mutate(
+        self,
+        service: str,
+        operations: list[dict[str, Any]],
+        customer_id: str | None = None,
+        validate_only: bool = True,
+        login_customer_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Send operations to a mutate endpoint.
+
+        `validate_only=True` asks Google to check the request and change
+        nothing, which is what makes a preview trustworthy: the same payload
+        that gets validated is the one later applied.
+        """
+        from .mutations import SERVICES
+
+        if service not in SERVICES:
+            raise GoogleAdsError(f"Unknown mutate service {service!r}.")
+        target = self._config.resolve_customer_id(customer_id)
+        url = (
+            f"{self._config.endpoint}/customers/{target}"
+            f"/{SERVICES[service]}:mutate"
+        )
+        body = {
+            "operations": operations,
+            "validateOnly": bool(validate_only),
+            # Without this a single bad row would reject the whole batch.
+            "partialFailure": not validate_only,
+        }
+        return await self._post(url, body, login_customer_id)
+
+    async def upload_click_conversions(
+        self,
+        conversions: list[dict[str, Any]],
+        customer_id: str | None = None,
+        validate_only: bool = True,
+        login_customer_id: str | None = None,
+    ) -> dict[str, Any]:
+        target = self._config.resolve_customer_id(customer_id)
+        url = f"{self._config.endpoint}/customers/{target}:uploadClickConversions"
+        body = {
+            "conversions": conversions,
+            "validateOnly": bool(validate_only),
+            "partialFailure": not validate_only,
+        }
+        return await self._post(url, body, login_customer_id)
+
+    async def _post(
+        self, url: str, body: dict[str, Any], login_customer_id: str | None
+    ) -> dict[str, Any]:
+        try:
+            response = await self._http.post(
+                url, headers=await self._headers(login_customer_id), json=body
+            )
+        except httpx.HTTPError as exc:
+            raise GoogleAdsError(f"Could not reach the Google Ads API: {exc}") from exc
+
+        if response.status_code != 200:
+            raise GoogleAdsError(_explain_api_error(response))
+
+        payload = response.json()
+        # partialFailure means a 200 can still carry per-row rejections.
+        failure = payload.get("partialFailureError")
+        if failure:
+            raise GoogleAdsError(
+                "Google rejected some operations:\n"
+                + _describe_partial_failure(failure)
+            )
+        return payload
+
+
+def _describe_partial_failure(failure: dict[str, Any]) -> str:
+    reasons = []
+    for detail in failure.get("details", []):
+        for item in detail.get("errors", []):
+            code = item.get("errorCode", {})
+            label = next(iter(code.values()), "") if isinstance(code, dict) else ""
+            index = ""
+            for element in item.get("location", {}).get("fieldPathElements", []):
+                if element.get("fieldName") == "operations":
+                    index = f"operation {element.get('index', '?')}: "
+            reasons.append(f"  - {index}{label}: {item.get('message', '')}".rstrip(": "))
+    return "\n".join(reasons) or f"  - {failure.get('message', 'unknown error')}"
+
+
 def _explain_api_error(response: httpx.Response, query: str | None = None) -> str:
     """Surface Google's nested error detail, plus a fix for the common cases."""
     try:
