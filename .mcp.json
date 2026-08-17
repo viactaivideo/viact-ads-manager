@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "google-ads": {
+      "command": "uv",
+      "args": ["run", "viact-ads-mcp"]
+    }
+  }
+}

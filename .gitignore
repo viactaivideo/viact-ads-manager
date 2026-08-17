@@ -1,0 +1,22 @@
+# Secrets — never commit these
+.env
+*.env
+!.env.example
+client_secret*.json
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
