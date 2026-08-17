@@ -45,16 +45,41 @@ def _flatten(node: Any, prefix: str = "") -> dict[str, Any]:
     return flat
 
 
+# Money fields Google reports in micros *without* naming them so. Averaged and
+# derived metrics all fall in here, which makes them easy to misread by a
+# factor of a million.
+IMPLICIT_MICROS = frozenset(
+    {
+        "metrics.average_cpc",
+        "metrics.average_cpm",
+        "metrics.average_cpv",
+        "metrics.average_cpe",
+        "metrics.average_cost",
+        "metrics.cost_per_conversion",
+        "metrics.cost_per_all_conversions",
+        "metrics.cost_per_current_model_attributed_conversion",
+    }
+)
+
+
 def _add_currency_fields(row: dict[str, Any]) -> dict[str, Any]:
-    """Google reports money in micros. Add human-scale companions."""
+    """Google reports money in micros. Add or convert to human-scale values."""
     for key in list(row):
-        if not key.endswith("_micros"):
+        explicit = key.endswith("_micros")
+        if not explicit and key not in IMPLICIT_MICROS:
             continue
         try:
             value = float(row[key])
         except (TypeError, ValueError):
             continue
-        row[key.removesuffix("_micros")] = round(value / 1_000_000, 4)
+        if explicit:
+            # Keep the raw field and add a companion: metrics.cost_micros
+            # stays, metrics.cost appears next to it.
+            row[key.removesuffix("_micros")] = round(value / 1_000_000, 4)
+        else:
+            # Nothing signals micros in the name, so convert in place rather
+            # than leaving a value that reads as a million times too large.
+            row[key] = round(value / 1_000_000, 4)
     return row
 
 

@@ -134,6 +134,23 @@ def test_currency_conversion_ignores_non_numeric():
     assert "metrics.cost" not in row
 
 
+def test_implicit_micros_fields_are_converted_in_place():
+    """average_cpc and cost_per_conversion are micros despite the name."""
+    row = _add_currency_fields(
+        {
+            "metrics.average_cpc": 6992649.575888569,
+            "metrics.cost_per_conversion": 647053174.0888889,
+        }
+    )
+    assert row["metrics.average_cpc"] == 6.9926
+    assert row["metrics.cost_per_conversion"] == 647.0532
+
+
+def test_non_money_metrics_are_left_alone():
+    row = _add_currency_fields({"metrics.ctr": 0.0031, "metrics.clicks": "4164"})
+    assert row == {"metrics.ctr": 0.0031, "metrics.clicks": "4164"}
+
+
 # --------------------------------------------------------------------------
 # Client behaviour against a stubbed API
 # --------------------------------------------------------------------------
