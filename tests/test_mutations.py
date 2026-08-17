@@ -489,3 +489,34 @@ def test_rename_rejects_empty_and_duplicate_input():
         mutations.rename("ad_group", "3767588103", [("1", "   ")])
     with pytest.raises(mutations.MutationError, match="Duplicate entity id"):
         mutations.rename("ad_group", "3767588103", [("1", "A"), ("1", "B")])
+
+
+def test_keyword_insertion_measures_default_text_not_the_macro():
+    """Google counts the default text; the {KeyWord:...} wrapper does not count.
+
+    The account runs an approved ad whose headline is 34 characters as written
+    and 24 as its default text, so measuring the whole string rejects copy
+    Google accepts.
+    """
+    assert mutations.effective_length("{KeyWord:Smart Site Safety System}") == 24
+    assert mutations.effective_length("{keyword:PPE Detection}") == 13
+    assert mutations.effective_length("Plain headline") == 14
+
+    headlines = ["{KeyWord:Smart Site Safety System}", "CITF Listed 4S Platform",
+                 "Multi-Site Safety Control"]
+    _, operations = mutations.create_responsive_search_ad(
+        "3767588103", "999", headlines,
+        ["Description one text here.", "Description two text here."],
+        "https://www.viact.ai/smart-site-safety-system")
+    texts = [h["text"] for h in
+             operations[0]["create"]["ad"]["responsiveSearchAd"]["headlines"]]
+    assert texts[0] == "{KeyWord:Smart Site Safety System}"
+
+
+def test_keyword_insertion_with_over_long_default_is_still_rejected():
+    with pytest.raises(mutations.MutationError, match="over 30 characters"):
+        mutations.create_responsive_search_ad(
+            "3767588103", "999",
+            ["{KeyWord:" + "x" * 31 + "}", "ok headline", "another headline"],
+            ["Description one.", "Description two."],
+            "https://www.viact.ai/")

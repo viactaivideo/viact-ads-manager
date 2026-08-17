@@ -533,6 +533,21 @@ def create_ad_group(
     return "ad_group", [{"create": payload}]
 
 
+_KEYWORD_INSERTION = re.compile(r"^\{keyword:(.*)\}$", re.IGNORECASE | re.DOTALL)
+
+
+def effective_length(text: str) -> int:
+    """Length Google measures against the character limit.
+
+    For keyword insertion, only the default text counts — the `{KeyWord:...}`
+    wrapper does not. Measuring the whole string rejects headlines Google
+    accepts, which is how this was found: the account already runs an approved
+    ad whose headline is 34 characters written, 24 as its default text.
+    """
+    match = _KEYWORD_INSERTION.match(str(text).strip())
+    return len(match.group(1)) if match else len(str(text))
+
+
 def create_responsive_search_ad(
     customer_id: str,
     ad_group_id: str,
@@ -556,11 +571,13 @@ def create_responsive_search_ad(
             f"Responsive search ads need 2-4 descriptions, got {len(descriptions)}."
         )
     for text in headlines:
-        if len(text) > 30:
-            raise MutationError(f"Headline over 30 characters ({len(text)}): {text!r}")
+        n = effective_length(text)
+        if n > 30:
+            raise MutationError(f"Headline over 30 characters ({n}): {text!r}")
     for text in descriptions:
-        if len(text) > 90:
-            raise MutationError(f"Description over 90 characters ({len(text)}): {text!r}")
+        n = effective_length(text)
+        if n > 90:
+            raise MutationError(f"Description over 90 characters ({n}): {text!r}")
     if not final_url.startswith(("http://", "https://")):
         raise MutationError(f"final_url must be a full URL, got {final_url!r}.")
 
