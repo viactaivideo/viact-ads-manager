@@ -440,6 +440,134 @@ async def remove_negative_keywords(
 
 
 @mcp.tool()
+async def list_shared_negative_lists(customer_id: str | None = None) -> dict:
+    """List the shared exclusion lists under Shared Library.
+
+    Read-only. Names are not unique — an archived list often shares a name with
+    the live one — so check `shared_set.status` before acting on an ID.
+    """
+    query = (
+        "SELECT shared_set.id, shared_set.name, shared_set.type,\n"
+        "       shared_set.status, shared_set.member_count\n"
+        "FROM shared_set\nWHERE shared_set.type = 'NEGATIVE_KEYWORDS'\n"
+        "ORDER BY shared_set.name"
+    )
+    return await _run(query, customer_id)
+
+
+@mcp.tool()
+async def list_shared_negative_keywords(
+    shared_set_id: str,
+    customer_id: str | None = None,
+    limit: int = 5000,
+) -> dict:
+    """List the terms inside a shared exclusion list.
+
+    Read-only. Match type matters: an EXACT negative blocks only that precise
+    query, while PHRASE and BROAD reach much further.
+    """
+    query = (
+        "SELECT shared_set.id, shared_set.name, shared_criterion.criterion_id,\n"
+        "       shared_criterion.keyword.text, shared_criterion.keyword.match_type\n"
+        f"FROM shared_criterion\nWHERE shared_set.id = {int(shared_set_id)}\n"
+        f"LIMIT {int(limit)}"
+    )
+    return await _run(query, customer_id)
+
+
+@mcp.tool()
+async def which_campaigns_use_shared_list(
+    shared_set_id: str, customer_id: str | None = None
+) -> dict:
+    """Show which campaigns a shared exclusion list is attached to.
+
+    Read-only. A list attached to nothing has no effect, however alarming its
+    contents; one on your top campaigns affects most of your spend.
+    """
+    query = (
+        "SELECT campaign.id, campaign.name, campaign.status, shared_set.name\n"
+        f"FROM campaign_shared_set\nWHERE shared_set.id = {int(shared_set_id)}\n"
+        "LIMIT 500"
+    )
+    return await _run(query, customer_id)
+
+
+@mcp.tool()
+async def remove_shared_negative_keywords(
+    shared_set_id: str,
+    keywords: list[str],
+    customer_id: str | None = None,
+    confirm: bool = False,
+) -> dict:
+    """Remove terms from a shared exclusion list, unblocking that traffic.
+
+    Args:
+        shared_set_id: The list to edit, from list_shared_negative_lists.
+        keywords: Exact keyword texts to remove. Matched case-insensitively
+            against the list; anything not found is reported rather than
+            silently skipped.
+        customer_id: Account to act on. Defaults to GOOGLE_ADS_CUSTOMER_ID.
+        confirm: Leave false to preview. Set true only after the user approves.
+
+    Terms are resolved by text rather than taken as IDs, so a mistyped ID
+    cannot remove some unrelated term. Removing a negative lets queries through
+    again, which can start costing money immediately — the preview lists every
+    campaign the list feeds.
+    """
+    target = _get_client()._config.resolve_customer_id(customer_id)
+    wanted = [k.strip() for k in keywords if k and k.strip()]
+    if not wanted:
+        raise mutations.MutationError("keywords must not be empty.")
+
+    existing = await _lookup(
+        "SELECT shared_criterion.criterion_id, shared_criterion.keyword.text,\n"
+        "       shared_criterion.keyword.match_type\n"
+        f"FROM shared_criterion WHERE shared_set.id = {int(shared_set_id)} LIMIT 10000",
+        target,
+    )
+    by_text: dict[str, list[dict]] = {}
+    for row in existing:
+        text = str(row.get("shared_criterion.keyword.text", "")).strip().lower()
+        by_text.setdefault(text, []).append(row)
+
+    matched, not_found = [], []
+    for term in wanted:
+        hits = by_text.get(term.lower())
+        if not hits:
+            not_found.append(term)
+            continue
+        for hit in hits:
+            matched.append(
+                {
+                    "criterion_id": hit.get("shared_criterion.criterion_id"),
+                    "text": hit.get("shared_criterion.keyword.text"),
+                    "match_type": hit.get("shared_criterion.keyword.match_type"),
+                }
+            )
+
+    if not matched:
+        raise mutations.MutationError(
+            f"None of these terms are in shared set {shared_set_id}: "
+            + ", ".join(wanted)
+        )
+
+    service, operations = mutations.remove_shared_criteria(
+        target, shared_set_id, [m["criterion_id"] for m in matched]
+    )
+    result = await _apply(service, operations, target, confirm)
+    result["shared_set_id"] = shared_set_id
+    result["matched"] = matched
+    result["not_found"] = not_found
+    if not confirm:
+        result["affected_campaigns"] = await _lookup(
+            "SELECT campaign.name, campaign.status FROM campaign_shared_set "
+            f"WHERE shared_set.id = {int(shared_set_id)} LIMIT 500",
+            target,
+        )
+    return result
+
+
+@mcp.tool()
 async def update_campaign_budget(
     daily_amount: float,
     campaign_id: str | None = None,

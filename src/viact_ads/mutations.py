@@ -28,6 +28,10 @@ SERVICES = {
     "campaign_criterion": "campaignCriteria",
     "ad_group_ad": "adGroupAds",
     "campaign_budget": "campaignBudgets",
+    # Shared exclusion lists under Shared Library. Their criteria are addressed
+    # as sharedSetId~criterionId, and are a different service from the
+    # campaign-level negatives even though the UI presents both as "negatives".
+    "shared_criterion": "sharedCriteria",
 }
 
 # What `set_status` can act on, and how to address each one.
@@ -199,11 +203,26 @@ def add_negative_keywords(
 
 def remove_criteria(resource_names: list[str], service: str) -> tuple[str, list[dict]]:
     """Remove criteria (negative keywords, keywords) by full resource name."""
-    if service not in ("campaign_criterion", "ad_group_criterion"):
+    if service not in ("campaign_criterion", "ad_group_criterion", "shared_criterion"):
         raise MutationError(f"Cannot remove criteria from service {service!r}.")
     if not resource_names:
         raise MutationError("resource_names must not be empty.")
     return service, [{"remove": name} for name in resource_names]
+
+
+def remove_shared_criteria(
+    customer_id: str, shared_set_id: str, criterion_ids: list[str]
+) -> tuple[str, list[dict]]:
+    """Remove terms from a shared exclusion list by criterion ID."""
+    if not criterion_ids:
+        raise MutationError("criterion_ids must not be empty.")
+    if not str(shared_set_id).strip():
+        raise MutationError("shared_set_id is required.")
+    names = [
+        resource_name("shared_criterion", customer_id, shared_set_id, criterion_id)
+        for criterion_id in criterion_ids
+    ]
+    return remove_criteria(names, "shared_criterion")
 
 
 # ---------------------------------------------------------------------------

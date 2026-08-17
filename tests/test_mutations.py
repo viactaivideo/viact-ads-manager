@@ -106,6 +106,28 @@ def test_ad_group_negative_keywords_attach_to_the_ad_group():
     assert operations[0]["create"]["adGroup"] == "customers/3767588103/adGroups/999"
 
 
+def test_shared_criteria_removal_builds_composite_resource_names():
+    service, operations = mutations.remove_shared_criteria(
+        "3767588103", "12093570497", ["2407683029958", "913188274"]
+    )
+    assert service == "shared_criterion"
+    assert operations == [
+        {"remove": "customers/3767588103/sharedCriteria/12093570497~2407683029958"},
+        {"remove": "customers/3767588103/sharedCriteria/12093570497~913188274"},
+    ]
+
+
+def test_shared_criteria_removal_rejects_empty_input():
+    with pytest.raises(mutations.MutationError, match="must not be empty"):
+        mutations.remove_shared_criteria("3767588103", "12093570497", [])
+
+
+def test_shared_criteria_are_a_different_service_from_campaign_negatives():
+    """The UI calls both 'negative keywords'; the API does not."""
+    assert mutations.SERVICES["shared_criterion"] == "sharedCriteria"
+    assert mutations.SERVICES["campaign_criterion"] == "campaignCriteria"
+
+
 def test_negative_keywords_need_exactly_one_parent():
     with pytest.raises(mutations.MutationError, match="exactly one"):
         mutations.add_negative_keywords("3767588103", ["free"], "PHRASE")
@@ -390,6 +412,7 @@ async def test_every_write_tool_defaults_to_preview():
         "create_responsive_search_ad",
         "add_keywords",
         "upload_offline_conversions",
+        "remove_shared_negative_keywords",
     }
 
     tools = {tool.name: tool for tool in await server.mcp.list_tools()}
