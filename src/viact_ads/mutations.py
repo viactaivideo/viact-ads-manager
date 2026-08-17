@@ -34,7 +34,17 @@ SERVICES = {
     "shared_criterion": "sharedCriteria",
     # Performance Max holds its creative in asset groups rather than ad groups.
     "asset_group": "assetGroups",
+    # AdService edits the ad itself (URLs, tracking). Distinct from
+    # adGroupAds, which only governs the ad's link to its ad group.
+    "ad": "ads",
 }
+
+# Levels that can carry a final URL suffix. Google applies only the most
+# specific one — they do not concatenate.
+SUFFIX_LEVELS = ("campaign", "ad_group", "ad")
+
+# Levels whose final URLs can be rewritten.
+URL_LEVELS = ("ad", "asset_group")
 
 # What `rename` will act on. Campaigns are deliberately absent: renaming one
 # breaks every report, saved filter and UTM already pointing at its name.
@@ -242,6 +252,77 @@ def rename(
                     "name": name,
                 },
                 ["name"],
+            )
+        )
+    return entity_type, operations
+
+
+def set_final_url_suffix(
+    entity_type: str, customer_id: str, pairs: list[tuple[str, str]]
+) -> tuple[str, list[dict]]:
+    """Set the final URL suffix on campaigns, ad groups, or ads.
+
+    Only the most specific level in effect is applied by Google, so the suffix
+    written here must be complete on its own rather than additive.
+    """
+    if entity_type not in SUFFIX_LEVELS:
+        raise MutationError(
+            f"A final URL suffix can only be set on {', '.join(SUFFIX_LEVELS)} — "
+            f"got {entity_type!r}."
+        )
+    if not pairs:
+        raise MutationError("pairs must not be empty.")
+
+    operations = []
+    for entity_id, suffix in pairs:
+        text = str(suffix).strip().lstrip("?")
+        if len(text) > 2048:
+            raise MutationError(f"Suffix over 2048 characters for {entity_id}.")
+        if text.startswith("&"):
+            raise MutationError(f"Suffix must not start with '&': {text!r}")
+        operations.append(
+            _update(
+                {
+                    "resourceName": resource_name(entity_type, customer_id, entity_id),
+                    "finalUrlSuffix": text,
+                },
+                ["finalUrlSuffix"],
+            )
+        )
+    return entity_type, operations
+
+
+def set_final_urls(
+    entity_type: str, customer_id: str, pairs: list[tuple[str, list[str]]]
+) -> tuple[str, list[dict]]:
+    """Replace the final URLs on ads or asset groups.
+
+    Changing an ad's URL sends it back through Google's policy review. The ad
+    keeps its ID, so its history stays attached to it.
+    """
+    if entity_type not in URL_LEVELS:
+        raise MutationError(
+            f"Final URLs can only be rewritten on {', '.join(URL_LEVELS)} — "
+            f"got {entity_type!r}."
+        )
+    if not pairs:
+        raise MutationError("pairs must not be empty.")
+
+    operations = []
+    for entity_id, urls in pairs:
+        cleaned = [str(u).strip() for u in urls if str(u).strip()]
+        if not cleaned:
+            raise MutationError(f"No final URLs given for {entity_id}.")
+        for url in cleaned:
+            if not url.startswith(("http://", "https://")):
+                raise MutationError(f"Not a full URL: {url!r}")
+        operations.append(
+            _update(
+                {
+                    "resourceName": resource_name(entity_type, customer_id, entity_id),
+                    "finalUrls": cleaned,
+                },
+                ["finalUrls"],
             )
         )
     return entity_type, operations
