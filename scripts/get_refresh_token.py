@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """Mint a Google Ads API refresh token via the OAuth2 loopback flow.
 
-Run this on your own machine (it needs a browser), not on a remote server:
+Run this on a machine that has a browser — it cannot run on a headless server:
 
-    python3 scripts/get_refresh_token.py
+    python3 scripts/get_refresh_token.py            # "Desktop app" OAuth client
+    python3 scripts/get_refresh_token.py --port 8080  # "Web application" client
 
 It reads GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET from the environment
 or from .env, and prompts if they are absent. Standard library only — no
 install step required.
+
+If you have no machine to run this on, use Google's OAuth Playground instead —
+see docs/SETUP.md, which covers that browser-only route.
 """
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import http.server
@@ -112,13 +117,29 @@ def prompt(name: str, secret: bool = False) -> str:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Mint a Google Ads API refresh token via the OAuth2 loopback flow."
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help=(
+            "Fix the loopback port instead of picking a free one. Required for a "
+            "'Web application' OAuth client, which only accepts redirect URIs that "
+            "were registered exactly — register http://localhost:PORT and pass the "
+            "same PORT here. 'Desktop app' clients accept any port, so leave unset."
+        ),
+    )
+    args = parser.parse_args()
+
     load_dotenv()
 
     print("Google Ads API — refresh token generator\n")
     client_id = prompt("GOOGLE_ADS_CLIENT_ID")
     client_secret = prompt("GOOGLE_ADS_CLIENT_SECRET", secret=True)
 
-    port = free_port()
+    port = args.port or free_port()
     redirect_uri = f"http://localhost:{port}"
 
     # PKCE, recommended by Google for installed/desktop OAuth clients.

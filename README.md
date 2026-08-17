@@ -31,9 +31,14 @@ uv sync
 
 cp .env.example .env          # then add your MCC developer token +
                               # OAuth client ID and secret
-python3 scripts/get_refresh_token.py   # run locally; opens a browser
+python3 scripts/get_refresh_token.py   # run where a browser is;
                                        # paste the result into .env
 ```
+
+No machine handy to run that on? The refresh token can also be minted entirely
+in the browser via Google's OAuth Playground — see
+[Path B in docs/SETUP.md](docs/SETUP.md#path-b--in-the-browser-with-the-oauth-playground).
+The resulting token is a portable string; where it was created does not matter.
 
 Then open this directory in Claude Code, approve the `google-ads` MCP server,
 and ask Claude to **run `check_connection`**.
