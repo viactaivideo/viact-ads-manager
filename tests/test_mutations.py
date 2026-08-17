@@ -413,6 +413,7 @@ async def test_every_write_tool_defaults_to_preview():
         "add_keywords",
         "upload_offline_conversions",
         "remove_shared_negative_keywords",
+        "rename_entities",
     }
 
     tools = {tool.name: tool for tool in await server.mcp.list_tools()}
@@ -443,3 +444,48 @@ def _client(handler) -> GoogleAdsClient:
     client._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     client._tokens._http = client._http
     return client
+
+
+# --------------------------------------------------------------------------
+# Renaming
+# --------------------------------------------------------------------------
+
+
+def test_rename_builds_name_update_with_mask():
+    service, operations = mutations.rename(
+        "ad_group", "3767588103", [("183774414699", "PPE Detection")]
+    )
+    assert service == "ad_group"
+    assert operations[0] == {
+        "update": {
+            "resourceName": "customers/3767588103/adGroups/183774414699",
+            "name": "PPE Detection",
+        },
+        "updateMask": "name",
+    }
+
+
+def test_rename_asset_group_uses_its_own_service():
+    service, operations = mutations.rename(
+        "asset_group", "3767588103", [("6546863961", "Smart Site Safety System")]
+    )
+    assert service == "asset_group"
+    assert (
+        operations[0]["update"]["resourceName"]
+        == "customers/3767588103/assetGroups/6546863961"
+    )
+
+
+def test_campaigns_cannot_be_renamed():
+    """Campaign names are referenced by reports and UTMs — renaming breaks them."""
+    with pytest.raises(mutations.MutationError, match="deliberately excluded"):
+        mutations.rename("campaign", "3767588103", [("123", "New Name")])
+
+
+def test_rename_rejects_empty_and_duplicate_input():
+    with pytest.raises(mutations.MutationError, match="must not be empty"):
+        mutations.rename("ad_group", "3767588103", [])
+    with pytest.raises(mutations.MutationError, match="Empty new name"):
+        mutations.rename("ad_group", "3767588103", [("1", "   ")])
+    with pytest.raises(mutations.MutationError, match="Duplicate entity id"):
+        mutations.rename("ad_group", "3767588103", [("1", "A"), ("1", "B")])

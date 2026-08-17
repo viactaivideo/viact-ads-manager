@@ -32,7 +32,13 @@ SERVICES = {
     # as sharedSetId~criterionId, and are a different service from the
     # campaign-level negatives even though the UI presents both as "negatives".
     "shared_criterion": "sharedCriteria",
+    # Performance Max holds its creative in asset groups rather than ad groups.
+    "asset_group": "assetGroups",
 }
+
+# What `rename` will act on. Campaigns are deliberately absent: renaming one
+# breaks every report, saved filter and UTM already pointing at its name.
+RENAMEABLE = ("ad_group", "asset_group")
 
 # What `set_status` can act on, and how to address each one.
 STATUS_TARGETS = {
@@ -199,6 +205,46 @@ def add_negative_keywords(
         for text in cleaned
     ]
     return service, operations
+
+
+def rename(
+    entity_type: str, customer_id: str, renames: list[tuple[str, str]]
+) -> tuple[str, list[dict]]:
+    """Rename ad groups or asset groups.
+
+    renames is a list of (entity_id, new_name). Campaigns are not renameable
+    here by design — their names are referenced by reports, saved filters and
+    UTM parameters that a rename would silently break.
+    """
+    if entity_type not in RENAMEABLE:
+        raise MutationError(
+            f"Only {' and '.join(RENAMEABLE)} can be renamed — got {entity_type!r}. "
+            "Campaigns are deliberately excluded."
+        )
+    if not renames:
+        raise MutationError("renames must not be empty.")
+
+    seen: set[str] = set()
+    operations = []
+    for entity_id, new_name in renames:
+        name = str(new_name).strip()
+        if not name:
+            raise MutationError(f"Empty new name for {entity_type} {entity_id}.")
+        if len(name) > 255:
+            raise MutationError(f"Name over 255 characters: {name!r}")
+        if str(entity_id) in seen:
+            raise MutationError(f"Duplicate entity id in renames: {entity_id}")
+        seen.add(str(entity_id))
+        operations.append(
+            _update(
+                {
+                    "resourceName": resource_name(entity_type, customer_id, entity_id),
+                    "name": name,
+                },
+                ["name"],
+            )
+        )
+    return entity_type, operations
 
 
 def remove_criteria(resource_names: list[str], service: str) -> tuple[str, list[dict]]:

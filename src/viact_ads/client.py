@@ -16,6 +16,10 @@ from .config import Config
 
 _CAMEL_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
 
+# Most mutate services accept partialFailure; AssetGroupService rejects the
+# field outright ("Unknown name partialFailure"), so it must be omitted there.
+NO_PARTIAL_FAILURE = frozenset({"asset_group"})
+
 
 class GoogleAdsError(RuntimeError):
     """Raised when the Google Ads API rejects a request."""
@@ -176,12 +180,13 @@ class GoogleAdsClient:
             f"{self._config.endpoint}/customers/{target}"
             f"/{SERVICES[service]}:mutate"
         )
-        body = {
+        body: dict[str, Any] = {
             "operations": operations,
             "validateOnly": bool(validate_only),
-            # Without this a single bad row would reject the whole batch.
-            "partialFailure": not validate_only,
         }
+        if service not in NO_PARTIAL_FAILURE:
+            # Without this a single bad row would reject the whole batch.
+            body["partialFailure"] = not validate_only
         return await self._post(url, body, login_customer_id)
 
     async def upload_click_conversions(

@@ -440,6 +440,96 @@ async def remove_negative_keywords(
 
 
 @mcp.tool()
+async def rename_entities(
+    entity_type: str,
+    renames: list[dict],
+    customer_id: str | None = None,
+    confirm: bool = False,
+) -> dict:
+    """Rename ad groups or asset groups.
+
+    Args:
+        entity_type: 'ad_group' or 'asset_group'.
+        renames: One dict per rename, each {"id": "<entity id>", "name": "<new name>"}.
+        customer_id: Account to act on. Defaults to GOOGLE_ADS_CUSTOMER_ID.
+        confirm: Leave false to preview. Set true only after the user approves.
+
+    Campaigns cannot be renamed through this tool. Their names are referenced by
+    reports, saved filters and UTM parameters, so a rename breaks things
+    silently and outside Google Ads.
+
+    The preview reports each entity's current name alongside the proposed one,
+    and refuses if a name would collide with another entity in the same parent.
+    """
+    target = _get_client()._config.resolve_customer_id(customer_id)
+    pairs = [(str(r.get("id", "")).strip(), str(r.get("name", "")).strip()) for r in renames]
+    if any(not i for i, _ in pairs):
+        raise mutations.MutationError("Every rename needs an 'id'.")
+
+    ids = ", ".join(i for i, _ in pairs)
+    if entity_type == "ad_group":
+        current = await _lookup(
+            "SELECT campaign.name, ad_group.id, ad_group.name, ad_group.status "
+            f"FROM ad_group WHERE ad_group.id IN ({ids})",
+            target,
+        )
+        key, parent = "ad_group", "campaign.name"
+    elif entity_type == "asset_group":
+        current = await _lookup(
+            "SELECT campaign.name, asset_group.id, asset_group.name, asset_group.status "
+            f"FROM asset_group WHERE asset_group.id IN ({ids})",
+            target,
+        )
+        key, parent = "asset_group", "campaign.name"
+    else:
+        raise mutations.MutationError(
+            f"entity_type must be 'ad_group' or 'asset_group' — got {entity_type!r}."
+        )
+
+    by_id = {str(r.get(f"{key}.id")): r for r in current}
+    missing = [i for i, _ in pairs if i not in by_id]
+
+    diff, collisions = [], []
+    proposed: dict[tuple[str, str], str] = {}
+    for entity_id, new_name in pairs:
+        row = by_id.get(entity_id, {})
+        campaign = row.get(parent, "?")
+        old = row.get(f"{key}.name", "?")
+        # Names need only be unique within their campaign, but a collision
+        # there would be rejected by Google after the preview passed.
+        slot = (campaign, new_name.lower())
+        if slot in proposed:
+            collisions.append(f"{campaign}: '{new_name}' proposed twice")
+        proposed[slot] = entity_id
+        diff.append({
+            "id": entity_id, "campaign": campaign,
+            "old_name": old, "new_name": new_name,
+            "status": row.get(f"{key}.status", "?"),
+            "unchanged": old == new_name,
+        })
+
+    if missing:
+        raise mutations.MutationError(
+            f"These {entity_type} ids were not found in account {target}: "
+            + ", ".join(missing)
+        )
+    if collisions:
+        raise mutations.MutationError("Name collisions:\n  - " + "\n  - ".join(collisions))
+
+    actionable = [(i, n) for (i, n), d in zip(pairs, diff) if not d["unchanged"]]
+    if not actionable:
+        return {"applied": False, "note": "Every name already matches — nothing to do.",
+                "diff": diff}
+
+    service, operations = mutations.rename(entity_type, target, actionable)
+    result = await _apply(service, operations, target, confirm)
+    result["entity_type"] = entity_type
+    result["diff"] = diff
+    result["skipped_already_correct"] = len(pairs) - len(actionable)
+    return result
+
+
+@mcp.tool()
 async def list_shared_negative_lists(customer_id: str | None = None) -> dict:
     """List the shared exclusion lists under Shared Library.
 
