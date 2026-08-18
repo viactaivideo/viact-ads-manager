@@ -42,6 +42,12 @@ SERVICES = {
     # than editing text in place.
     "asset": "assets",
     "asset_group_asset": "assetGroupAssets",
+    # Extension assets (sitelinks, callouts, snippets) attach at three levels.
+    # The link is what carries the status, so detaching one is a remove on the
+    # link, never on the shared asset it points at.
+    "customer_asset": "customerAssets",
+    "campaign_asset": "campaignAssets",
+    "ad_group_asset": "adGroupAssets",
 }
 
 # Levels that can carry a final URL suffix. Google applies only the most
