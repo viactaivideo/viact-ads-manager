@@ -6,11 +6,11 @@ more than once.
 
 | Claim | Exact wording | Length |
 |---|---|---|
-| AI modules | `200+ Safety AI Modules` | 22 |
-| Global projects | `500+ Global Projects` | 20 |
+| AI modules | `200+ Safety Modules` | 19 |
+| Projects | `500+ Projects Worldwide` | 23 |
 
 Both fit Google's 30-character headline limit. In a description, embed the
-string verbatim: *"Trusted Across 500+ Global Projects With Enterprise-Wide
+string verbatim: *"Trusted Across 500+ Projects Worldwide With Enterprise-Wide
 Safety Management."*
 
 ## Variants replaced on 17 Aug 2026
@@ -19,12 +19,13 @@ Twenty ads across GCC_Search_Leads, SG_Search_Leads and HK_Search_Leads used
 nine different phrasings of these two claims:
 
     300+ Successful Projects        500+ Successful Projects
-    500+ Projects Worldwide         400+ Projects
-    200+ Smart Safety Rules         200+ Safety Modules
+    500+ Global Projects            400+ Projects
+    200+ Smart Safety Rules         200+ Safety AI Modules
     200+ Pre-Built AI Modules       200+ In-built Safety Rules
     200+ Ai Safety Modules
 
-All now read the canonical wording.
+All now read the canonical wording. The wording was revised once during that
+session; the values above are final.
 
 ## Claims that must not be used
 
