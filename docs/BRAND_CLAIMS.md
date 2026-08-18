@@ -105,6 +105,39 @@ Any of these may be reinstated once the underlying evidence is confirmed.
 the right number in the wrong words; it now reads `500+ Projects Worldwide`
 like everything else.
 
+## Held pending verification — CITF
+
+`CITF Listed Tech` and the wording derived from it assert that viAct appears on
+the Construction Innovation and Technology Fund pre-approved list. That is a
+claim about a third party placing viAct on a government-fund register, which is
+a stronger class of claim than anything else in this file.
+
+It could not be independently verified: citf.cic.hk is unreachable from the
+build environment and public search does not surface viAct on the list. The
+account owner was asked on 18 Aug 2026 and answered "not sure — hold".
+
+Held, still serving, awaiting the owner's confirmation:
+
+| Wording | Where |
+|---|---|
+| `CITF Listed Tech` | HK_Search_Leads callout 314232786752 |
+| `CITF Listed Safety Tech` | HK_Search_Leads ad 813415085758, headline |
+| `4S Label Ready. CITF Listed. Digital Supervision Simplified. Seamless Integration.` | HK_Search_Leads ad 780076309642, description |
+
+No new CITF wording was created and the CITF keyword cluster was not built.
+Confirm the pre-approval item code and these become verified; if viAct is not
+listed, all three must come out.
+
+Note the same description also reads `Digital Supervision Simplified`. viAct
+does not support DWSS, so that phrase should be reviewed with the CITF wording.
+
+## Products not to advertise
+
+**DWSS (Digital Works Supervision System)** — viAct does not support this
+product. Instructed 18 Aug 2026. DWSS must not appear in any keyword, headline,
+description, sitelink, callout or snippet. `dwss`, `digital works supervision`,
+`works supervision` and `risc form` are campaign negatives on HK_Search_Leads.
+
 ## Awaiting a decision
 
 Unverified counts with no canonical form. These were **not** changed —
