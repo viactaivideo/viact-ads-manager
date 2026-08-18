@@ -17,6 +17,9 @@ except ImportError:  # pragma: no cover - SDK 1.x fallback
     from mcp.server.fastmcp import FastMCP as _Server
 
 from . import __version__, mutations, reports
+from .ga4 import GA4Client
+from .google_api import GoogleApiClient
+from .gtm import GTMClient
 from .client import GoogleAdsClient
 from .config import ConfigError, load_config, normalize_customer_id
 
@@ -965,6 +968,192 @@ async def upload_offline_conversions(
         "customer_id": target,
         "uploaded_count": len(result.get("results", [])),
     }
+
+
+# --------------------------------------------------------------------------
+# Google Analytics 4 and Tag Manager
+#
+# These share the Google Ads OAuth client and refresh token but not its
+# developer token, which Google Ads alone requires. All read-only: GTM writes
+# are deliberately absent because publishing a container change takes effect
+# on the live website immediately.
+# --------------------------------------------------------------------------
+
+_api_client: GoogleApiClient | None = None
+
+
+def _get_api() -> GoogleApiClient:
+    global _api_client
+    if _api_client is None:
+        _api_client = GoogleApiClient(load_config())
+    return _api_client
+
+
+@mcp.tool()
+async def google_check_scopes() -> dict:
+    """Report which Google APIs the current refresh token can actually reach.
+
+    Scopes are fixed when a refresh token is issued, so adding them in Cloud
+    Console has no effect until a new token is minted. Run this first when a
+    GA4 or Tag Manager call fails with an authentication error.
+    """
+    scopes = await _get_api().scopes()
+    wanted = {
+        "adwords": "Google Ads",
+        "analytics.readonly": "GA4 read",
+        "analytics.edit": "GA4 write",
+        "tagmanager.readonly": "Tag Manager read",
+        "tagmanager.edit.containers": "Tag Manager write",
+        "tagmanager.publish": "Tag Manager publish",
+    }
+    have = {label: any(s.endswith("/" + key) for s in scopes)
+            for key, label in wanted.items()}
+    return {
+        "scopes_on_token": scopes,
+        "capabilities": have,
+        "missing": [k for k, v in have.items() if not v],
+        "note": ("Anything missing means the refresh token predates that scope. "
+                 "Re-mint it with every scope listed at once."),
+    }
+
+
+@mcp.tool()
+async def ga4_key_events(property_id: str | None = None) -> dict:
+    """List GA4 key events — what GA4 counts as a conversion.
+
+    Key events are what GA4 exports to Google Ads as conversion actions.
+    Whether an imported action then counts toward bidding is set on the
+    Google Ads side, not here.
+
+    Args:
+        property_id: GA4 property. Defaults to GA4_PROPERTY_ID.
+    """
+    return await GA4Client(_get_api()).key_events(property_id)
+
+
+@mcp.tool()
+async def ga4_data_streams(property_id: str | None = None) -> dict:
+    """List GA4 data streams, including the G-XXXX measurement ID on each.
+
+    Useful for confirming the property Tag Manager sends to is the one being
+    read here.
+    """
+    return await GA4Client(_get_api()).data_streams(property_id)
+
+
+@mcp.tool()
+async def ga4_google_ads_links(property_id: str | None = None) -> dict:
+    """Show which Google Ads accounts this GA4 property is linked to."""
+    return await GA4Client(_get_api()).google_ads_links(property_id)
+
+
+@mcp.tool()
+async def ga4_report(
+    dimensions: list[str],
+    metrics: list[str],
+    date_range: str = "LAST_30_DAYS",
+    property_id: str | None = None,
+    limit: int = 250,
+    order_by_metric: str | None = None,
+) -> dict:
+    """Run any GA4 report.
+
+    Args:
+        dimensions: e.g. ["sessionSource", "sessionMedium", "landingPage"].
+        metrics: e.g. ["sessions", "keyEvents", "engagementRate"].
+        date_range: LAST_7_DAYS, LAST_30_DAYS, LAST_90_DAYS, or
+            'YYYY-MM-DD,YYYY-MM-DD'.
+        property_id: Defaults to GA4_PROPERTY_ID.
+        limit: Maximum rows.
+        order_by_metric: Metric to sort by, descending.
+    """
+    return await GA4Client(_get_api()).run_report(
+        dimensions, metrics, date_range, property_id, limit, order_by_metric)
+
+
+@mcp.tool()
+async def ga4_conversions_by_source(
+    date_range: str = "LAST_30_DAYS", property_id: str | None = None
+) -> dict:
+    """Key events broken down by traffic source, medium and campaign.
+
+    This is where UTM tagging shows up: a campaign tagged inconsistently
+    appears here as several rows instead of one.
+    """
+    return await GA4Client(_get_api()).run_report(
+        ["sessionSource", "sessionMedium", "sessionCampaignName"],
+        ["sessions", "keyEvents", "engagedSessions", "engagementRate"],
+        date_range, property_id, 200, "sessions")
+
+
+@mcp.tool()
+async def ga4_landing_page_performance(
+    date_range: str = "LAST_30_DAYS", property_id: str | None = None, limit: int = 50
+) -> dict:
+    """Landing page engagement — sessions, bounce, engagement time, key events.
+
+    Relevant to Google Ads Quality Score, whose landing page component is
+    driven by the experience these numbers describe.
+    """
+    return await GA4Client(_get_api()).run_report(
+        ["landingPage"],
+        ["sessions", "bounceRate", "averageSessionDuration",
+         "engagementRate", "keyEvents"],
+        date_range, property_id, limit, "sessions")
+
+
+@mcp.tool()
+async def ga4_event_counts(
+    date_range: str = "LAST_30_DAYS", property_id: str | None = None, limit: int = 100
+) -> dict:
+    """Every event name and how often it fired.
+
+    Use it to confirm an event exists and fires before treating it as a
+    conversion.
+    """
+    return await GA4Client(_get_api()).run_report(
+        ["eventName"], ["eventCount", "totalUsers"],
+        date_range, property_id, limit, "eventCount")
+
+
+@mcp.tool()
+async def gtm_containers(account_id: str | None = None) -> dict:
+    """List Tag Manager containers, with both numeric and GTM-XXXX public IDs."""
+    return await GTMClient(_get_api()).containers(account_id)
+
+
+@mcp.tool()
+async def gtm_tags(
+    container_id: str | None = None,
+    account_id: str | None = None,
+    workspace_id: str | None = None,
+) -> dict:
+    """List tags in a Tag Manager workspace, with their firing triggers.
+
+    container_id accepts the numeric ID or the GTM-XXXX public ID; the public
+    form is resolved automatically. Defaults to the default workspace.
+    """
+    return await GTMClient(_get_api()).tags(container_id, account_id, workspace_id)
+
+
+@mcp.tool()
+async def gtm_triggers(
+    container_id: str | None = None,
+    account_id: str | None = None,
+    workspace_id: str | None = None,
+) -> dict:
+    """List triggers in a Tag Manager workspace."""
+    return await GTMClient(_get_api()).triggers(container_id, account_id, workspace_id)
+
+
+@mcp.tool()
+async def gtm_variables(
+    container_id: str | None = None,
+    account_id: str | None = None,
+    workspace_id: str | None = None,
+) -> dict:
+    """List variables in a Tag Manager workspace."""
+    return await GTMClient(_get_api()).variables(container_id, account_id, workspace_id)
 
 
 def main() -> None:
