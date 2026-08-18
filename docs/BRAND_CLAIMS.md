@@ -27,6 +27,19 @@ nine different phrasings of these two claims:
 All now read the canonical wording. The wording was revised once during that
 session; the values above are final.
 
+## Both claims are mandatory in every ad
+
+Every responsive search ad and every Performance Max asset group in an active
+Search or PMax campaign must carry both strings, and no headline may be
+duplicated within the same ad. Video and remarketing campaigns are out of
+scope.
+
+Both were at Google's headline cap, so each addition displaced an existing
+headline. No asset in the account carries a performance label — all 640 read
+NOT_APPLICABLE — so "low performing" cannot be read from data. Headlines were
+displaced on the two grounds that are evidenced: an exact or near duplicate of
+another headline in the same ad, or a claim that cannot be substantiated.
+
 ## Claims that must not be used
 
 | Claim | Reason |
@@ -37,6 +50,14 @@ session; the values above are final.
 | `95% Workflow Transparency` | Same. |
 | `90% Better Surveillance` | Same. |
 | `92% Fewer PPE Violations` | Same. |
+| `No.1 Safety VSS` | Unverifiable superiority claim. Removed from SG_Pmax_VSS. |
+| `No. 1 Construction VSS` | Same. Removed from SG_Pmax_VSS. |
+
+Still live and unsubstantiated, left in place pending a decision:
+`No.1 Construction Surveillance` and `Singapore's Leading VSS` (SG_Pmax_VSS),
+`100% Safety Compliance` (HK_Search_Leads ad 780076309642), and
+`Best Construction Safety App in Singapore: 90% Less Accidents in first 2
+Weeks with AI` (SG_Pmax_VSS description).
 
 These may be reinstated once the underlying evidence is confirmed.
 

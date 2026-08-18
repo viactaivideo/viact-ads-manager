@@ -37,6 +37,11 @@ SERVICES = {
     # AdService edits the ad itself (URLs, tracking). Distinct from
     # adGroupAds, which only governs the ad's link to its ad group.
     "ad": "ads",
+    # Performance Max creative is a set of links between an asset group and
+    # account-level assets, so adding a headline means linking an asset rather
+    # than editing text in place.
+    "asset": "assets",
+    "asset_group_asset": "assetGroupAssets",
 }
 
 # Levels that can carry a final URL suffix. Google applies only the most
