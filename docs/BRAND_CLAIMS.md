@@ -105,6 +105,49 @@ Any of these may be reinstated once the underlying evidence is confirmed.
 the right number in the wrong words; it now reads `500+ Projects Worldwide`
 like everything else.
 
+## Variant wordings unified account-wide
+
+18 Aug 2026, on instruction that `200+ Smart Safety Rules` and
+`200+ Safety Modules` state the same thing. Applied at every status, not just
+serving units — a dormant variant goes live the moment its ad group is
+re-enabled, which is exactly how five bad assets reached serving earlier the
+same day.
+
+Replaced with `200+ Safety Modules` (25 instances):
+
+    200+ Smart Safety Rules        200+ AI Safety Modules
+    200+ Ai Safety Modules         100+ Pre-Built AI Modules
+    100+ AI Modules                100+ AI models to help in monitoring...
+    30 AI modules to enhance...
+
+Replaced with `500+ Projects Worldwide` (29 instances):
+
+    300+ Successful Projects
+
+Two descriptions were also rewritten to drop `Zero Blind Spot`, which is an
+absolute claim, while their module count was corrected.
+
+### Deliberately NOT rewritten
+
+These contain a number and a module, but they are a different statement — what
+a free trial includes, not how large the platform is. Rewriting them to `200+`
+would change their meaning rather than standardise it.
+
+| Wording | Where |
+|---|---|
+| `Free Platform & 2 AI Modules` | Leads Search_ai4construction_SG, ads 541600158478 and 541665368291 |
+| `14Days Freemium +2 AI module` | Website Leads - Dynamic, ad 567665191129 |
+| `Try Our 2 AI Modules & Get Hands on` | Oil And Gas, campaign sitelink 46204334939 |
+
+Three Chinese-language headlines on ad 567665191129 also carry module counts
+and a 90% accuracy claim. They need copy written in Chinese by someone who
+writes it — not a machine translation of an approved English claim.
+
+Two Singapore descriptions name a specific client and a regional count —
+`30+ Projects with Housing and Development Board and 50+ A1 Contractors`. No
+approved wording exists for a regional figure, so they are reported rather
+than guessed at. Ads 690420462146 and 690421129907, both paused.
+
 ## Held pending verification — CITF
 
 `CITF Listed Tech` and the wording derived from it assert that viAct appears on
