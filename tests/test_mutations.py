@@ -253,12 +253,13 @@ def test_responsive_search_ad_enforces_google_limits():
 # --------------------------------------------------------------------------
 
 
-def test_click_conversions_require_exactly_one_identifier():
-    with pytest.raises(mutations.MutationError, match="exactly one of gclid"):
+def test_click_conversions_require_an_identifier():
+    """A click id or a hashed email. Neither is an error; two click ids are too."""
+    with pytest.raises(mutations.MutationError, match="needs a click identifier"):
         mutations.build_click_conversions(
             "3767588103", "555", [{"conversion_date_time": "2026-08-01 14:30:00+08:00"}]
         )
-    with pytest.raises(mutations.MutationError, match="exactly one of gclid"):
+    with pytest.raises(mutations.MutationError, match="more than one click identifier"):
         mutations.build_click_conversions(
             "3767588103",
             "555",

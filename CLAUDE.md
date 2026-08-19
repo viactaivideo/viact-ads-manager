@@ -17,3 +17,22 @@ user, apply only on their word.
 
 Campaigns are never renamed: their names are referenced by reports, saved
 filters and the UTM strings baked into live URLs.
+
+## Pipedrive to Google Ads bridge
+
+`scripts/pipedrive_to_google_ads.py` reads deals from Pipedrive and uploads
+them as offline conversions, so Smart Bidding optimises toward leads sales
+actually valued rather than toward whoever fills forms most cheaply.
+
+Run it in preview first. It contacts Pipedrive but sends Google nothing:
+
+    uv run python scripts/pipedrive_to_google_ads.py --days 14
+    uv run python scripts/pipedrive_to_google_ads.py --days 14 --apply
+
+Google discards conversions whose originating click is too old — 90 days for
+a click id, 63 for an email match — so `bridge.prepare` filters on age and
+reports every skip. A bridge that uploads everything looks like it worked and
+changes nothing.
+
+Lost deals upload at value 0 rather than being withheld. That is what teaches
+bidding which sources to stop buying.

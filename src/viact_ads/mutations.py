@@ -48,6 +48,7 @@ SERVICES = {
     "customer_asset": "customerAssets",
     "campaign_asset": "campaignAssets",
     "ad_group_asset": "adGroupAssets",
+    "conversion_action": "conversionActions",
 }
 
 # Levels that can carry a final URL suffix. Google applies only the most
@@ -649,6 +650,7 @@ def add_keywords(
 # Offline conversions
 # ---------------------------------------------------------------------------
 
+_SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 _CONVERSION_TIME = re.compile(
     r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$"
 )
@@ -661,9 +663,15 @@ def build_click_conversions(
 ) -> list[dict[str, Any]]:
     """Shape offline conversions for :uploadClickConversions.
 
-    Each entry needs a click identifier (gclid, gbraid, or wbraid) and a
-    conversion_date_time as 'YYYY-MM-DD HH:MM:SS+HH:MM' in the account's
-    timezone.
+    Each entry needs either a click identifier (gclid, gbraid, or wbraid) or a
+    hashed_email, plus a conversion_date_time as 'YYYY-MM-DD HH:MM:SS+HH:MM'
+    in the account's timezone.
+
+    The hashed_email path is enhanced conversions for leads: Google matches the
+    address back to the click itself, so the CRM never has to store a click ID.
+    It buys a shorter window than a click identifier does - Google discards
+    email-matched uploads more than 63 days after the click, against 90 for a
+    gclid - so the caller is responsible for filtering on age.
     """
     if not conversions:
         raise MutationError("conversions must not be empty.")
@@ -672,10 +680,22 @@ def build_click_conversions(
     built = []
     for index, entry in enumerate(conversions):
         identifiers = {k: entry.get(k) for k in ("gclid", "gbraid", "wbraid") if entry.get(k)}
-        if len(identifiers) != 1:
+        hashed = str(entry.get("hashed_email") or "").strip().lower()
+        if hashed and not _SHA256_HEX.match(hashed):
             raise MutationError(
-                f"Conversion {index} needs exactly one of gclid, gbraid, or wbraid; "
-                f"got {list(identifiers) or 'none'}."
+                f"Conversion {index} has hashed_email {hashed!r}; expected a "
+                f"SHA-256 hex digest of the normalised address (64 hex chars). "
+                f"Use viact_ads.pipedrive.hash_email to produce it."
+            )
+        if len(identifiers) > 1:
+            raise MutationError(
+                f"Conversion {index} carries more than one click identifier: "
+                f"{list(identifiers)}. Send exactly one."
+            )
+        if not identifiers and not hashed:
+            raise MutationError(
+                f"Conversion {index} needs a click identifier (gclid, gbraid, or "
+                f"wbraid) or a hashed_email; got neither."
             )
         when = entry.get("conversion_date_time", "")
         if not _CONVERSION_TIME.match(str(when)):
@@ -688,6 +708,8 @@ def build_click_conversions(
             "conversionDateTime": when,
             **identifiers,
         }
+        if hashed:
+            payload["userIdentifiers"] = [{"hashedEmail": hashed}]
         if entry.get("conversion_value") is not None:
             payload["conversionValue"] = float(entry["conversion_value"])
             payload["currencyCode"] = entry.get("currency_code", "HKD")
