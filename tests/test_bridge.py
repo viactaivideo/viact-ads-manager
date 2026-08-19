@@ -200,3 +200,44 @@ def test_missing_token_names_where_to_get_one(monkeypatch):
     monkeypatch.delenv("PIPEDRIVE_API_TOKEN", raising=False)
     with pytest.raises(PipedriveError, match="Personal preferences"):
         pipedrive.api_token()
+
+
+@pytest.mark.asyncio
+async def test_v2_person_id_is_an_integer_so_the_email_needs_a_second_lookup():
+    """The bug that skipped every real deal: v2 does not inline person email."""
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if "persons" in request.url.path:
+            return httpx.Response(200, json={"success": True, "data": [
+                {"id": 42, "emails": [{"value": "buyer@acme.com", "primary": True}]},
+            ]})
+        return httpx.Response(200, json={"success": True, "data": [
+            {"id": 7, "title": "Acme", "status": "won", "person_id": 42,
+             "add_time": "2026-08-01 09:00:00"},
+        ]})
+
+    c = _client(handler)
+    deals = await c.deals()
+    await c.aclose()
+    assert deals[0].email == "buyer@acme.com"
+    assert any("persons" in p for p in calls), "should have looked the person up"
+
+
+@pytest.mark.asyncio
+async def test_person_lookup_is_skipped_when_no_deal_needs_it():
+    """One address-book pass per batch at most, and none when it buys nothing."""
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        return httpx.Response(200, json={"success": True, "data": [
+            {"id": 7, "title": "Acme", "status": "won", "person_id": None,
+             "add_time": "2026-08-01 09:00:00"},
+        ]})
+
+    c = _client(handler)
+    await c.deals()
+    await c.aclose()
+    assert not any("persons" in p for p in calls)

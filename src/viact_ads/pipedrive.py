@@ -178,6 +178,7 @@ class PipedriveClient:
         updated_since: str | None = None,
         limit: int = 500,
         gclid_field: str | None = None,
+        resolve_emails: bool = True,
     ) -> list[Deal]:
         """Read deals, newest first, resolving email and any GCLID field.
 
@@ -200,8 +201,15 @@ class PipedriveClient:
             params["updated_since"] = updated_since
 
         payload = await self._get("/api/v2/deals", params)
+        rows = payload.get("data") or []
+
+        # v2 gives person_id as an integer, so the email needs a second lookup.
+        lookup: dict[int, str] = {}
+        if resolve_emails and any(isinstance(r.get("person_id"), int) for r in rows):
+            lookup = await self.person_emails()
+
         out: list[Deal] = []
-        for row in payload.get("data") or []:
+        for row in rows:
             out.append(
                 Deal(
                     id=int(row.get("id", 0)),
@@ -213,12 +221,42 @@ class PipedriveClient:
                     add_time=row.get("add_time"),
                     won_time=row.get("won_time"),
                     update_time=row.get("update_time"),
-                    email=_first_email(row),
+                    email=_first_email(row) or lookup.get(_person_id(row)),
                     gclid=_custom(row, gclid_key),
                 )
             )
         return out
 
+
+    # ------------------------------------------------------------------
+    # People
+    # ------------------------------------------------------------------
+    async def person_emails(self) -> dict[int, str]:
+        """Map person id -> primary email.
+
+        API v2 returns ``person_id`` on a deal as a bare integer; unlike v1 it
+        does not inline the person's email. Google matches an offline
+        conversion on that email, so it has to be fetched separately and
+        joined on. Paged rather than fetched per deal: one pass over the
+        address book costs a handful of requests instead of one per deal.
+        """
+        emails: dict[int, str] = {}
+        cursor: str | None = None
+        while True:
+            params: dict[str, Any] = {"limit": 500}
+            if cursor:
+                params["cursor"] = cursor
+            payload = await self._get("/api/v2/persons", params)
+            rows = payload.get("data") or []
+            for row in rows:
+                pid = row.get("id")
+                email = _first_email(row)
+                if pid is not None and email:
+                    emails[int(pid)] = email
+            cursor = (payload.get("additional_data") or {}).get("next_cursor")
+            if not cursor or not rows:
+                break
+        return emails
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -252,6 +290,17 @@ class PipedriveClient:
         }
 
 
+def _person_id(row: dict[str, Any]) -> int:
+    """The deal's person id, whether v2 gave an integer or v1 gave an object."""
+    person = row.get("person_id")
+    if isinstance(person, dict):
+        person = person.get("value") or person.get("id")
+    try:
+        return int(person)
+    except (TypeError, ValueError):
+        return -1
+
+
 def _as_float(value: Any) -> float | None:
     try:
         return float(value)
@@ -272,10 +321,12 @@ def _custom(row: dict[str, Any], key: str | None) -> str | None:
 
 
 def _first_email(row: dict[str, Any]) -> str | None:
-    """Pull the person's primary email from a v2 deal payload."""
+    """Primary email from a person row, or from a deal that inlines one."""
     person = row.get("person_id")
+    if not isinstance(person, dict) and (row.get("emails") or row.get("email")):
+        person = row  # a person row from /api/v2/persons
     if isinstance(person, dict):
-        emails = person.get("email") or person.get("emails") or []
+        emails = person.get("emails") or person.get("email") or []
         if isinstance(emails, str):
             return emails.strip() or None
         for entry in emails:
