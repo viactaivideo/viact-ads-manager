@@ -31,6 +31,10 @@ on:
         description: "Report the shape of the Pipedrive data and stop"
         type: boolean
         default: false
+      prepare_only:
+        description: "Report what would be sent and stop, without contacting Google"
+        type: boolean
+        default: false
   schedule:
     # 02:00 UTC = 10:00 Hong Kong, after the previous day has closed out.
     - cron: "0 2 * * *"
@@ -89,11 +93,13 @@ jobs:
           STATUS: ${{ inputs.status || 'all' }}
           WANTS_APPLY: ${{ inputs.apply }}
           DIAGNOSE: ${{ inputs.diagnose }}
+          PREPARE_ONLY: ${{ inputs.prepare_only }}
           SCHEDULED_APPLY: ${{ vars.PD_BRIDGE_APPLY }}
         run: |
           # This repository is public, so its Actions logs are public too.
           # --redact keeps deal titles - client and tender names - out of them.
           flags="--days $DAYS --redact"
+          [ "$PREPARE_ONLY" = "true" ] && flags="$flags --prepare-only"
           if [ "$DIAGNOSE" = "true" ]; then
             python scripts/pipedrive_to_google_ads.py --diagnose
             exit $?

@@ -47,6 +47,8 @@ async def main() -> int:
     ap.add_argument("--apply", action="store_true", help="actually upload")
     ap.add_argument("--redact", action="store_true",
                     help="print deal ids instead of titles, for logs others can read")
+    ap.add_argument("--prepare-only", action="store_true",
+                    help="report what would be sent and stop, without contacting Google")
     ap.add_argument("--diagnose", action="store_true",
                     help="report the shape of the Pipedrive data and stop")
     args = ap.parse_args()
@@ -116,6 +118,9 @@ async def main() -> int:
         print(f"  {k:<52} {v}")
 
     if not result.ready:
+        return 0
+    if args.prepare_only:
+        print("\nPrepared only. Google was not contacted.")
         return 0
 
     payload = build_click_conversions(
