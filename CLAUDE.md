@@ -37,6 +37,22 @@ changes nothing.
 Lost deals upload at value 0 rather than being withheld. That is what teaches
 bidding which sources to stop buying.
 
+Google closed `ConversionUploadService.UploadClickConversions` to new
+integrations on 19 Aug 2026: this account gets
+`CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE` and is told to use the Data Manager
+API instead. Everything upstream of the upload works and is tested; only the
+delivery step needs rebuilding. Measured against the 500 most recently updated
+won deals, 78 qualify (all by email match, none by click id), 413 are past the
+63-day email window and 9 carry neither identifier.
+
+Pipedrive stores no Google click id — all 74 deal fields were checked. Until
+one is captured on the web forms and written to the deal, the bridge can only
+offer email matching, which expires at 63 days and matches nothing for deals
+that never began with an ad click.
+
+`PipedriveClient.deals()` reads one page and stops at 500 rows. Any count it
+reports is a floor, not a total.
+
 Pipedrive is not reachable from the Claude Code session sandbox: the egress
 policy rejects both `api.pipedrive.com` and `viact.pipedrive.com`. The bridge
 therefore runs from `.github/workflows/pipedrive-bridge.yml`, on GitHub's
