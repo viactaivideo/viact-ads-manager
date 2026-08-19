@@ -201,7 +201,10 @@ class GoogleAdsClient:
         body = {
             "conversions": conversions,
             "validateOnly": bool(validate_only),
-            "partialFailure": not validate_only,
+            # Google requires this on every call to this method, preview
+            # included: without it the request is rejected outright with
+            # PARTIAL_FAILURE_MODE_REQUIRED before a single row is examined.
+            "partialFailure": True,
         }
         return await self._post(url, body, login_customer_id)
 

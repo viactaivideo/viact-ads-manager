@@ -241,3 +241,4 @@ async def test_person_lookup_is_skipped_when_no_deal_needs_it():
     await c.deals()
     await c.aclose()
     assert not any("persons" in p for p in calls)
+

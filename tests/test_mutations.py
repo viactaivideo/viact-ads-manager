@@ -521,3 +521,30 @@ def test_keyword_insertion_with_over_long_default_is_still_rejected():
             ["{KeyWord:" + "x" * 31 + "}", "ok headline", "another headline"],
             ["Description one.", "Description two."],
             "https://www.viact.ai/")
+
+
+@pytest.mark.asyncio
+async def test_conversion_upload_always_sets_partial_failure_even_in_preview():
+    """Google rejects uploadClickConversions outright without it.
+
+    Unlike the generic mutate endpoints, this one requires partialFailure on
+    every call - a preview with it off comes back PARTIAL_FAILURE_MODE_REQUIRED
+    before any row is looked at.
+    """
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "oauth2" in str(request.url):
+            return httpx.Response(200, json={"access_token": "t", "expires_in": 3600})
+        import json as _json
+        seen.append(_json.loads(request.content))
+        return httpx.Response(200, json={"results": []})
+
+    client = _client(handler)
+    await client.upload_click_conversions(
+        [{"gclid": "x", "conversionDateTime": "2026-08-01 08:30:00+08:00"}],
+        validate_only=True,
+    )
+    await client.aclose()
+    assert seen[-1]["validateOnly"] is True
+    assert seen[-1]["partialFailure"] is True
