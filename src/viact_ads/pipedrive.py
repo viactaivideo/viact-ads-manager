@@ -22,6 +22,8 @@ from typing import Any
 
 import httpx
 
+from .config import load_dotenv
+
 DEFAULT_HOST = "https://api.pipedrive.com"
 FIELD_HASH = re.compile(r"^[0-9a-f]{40}$")
 
@@ -32,6 +34,7 @@ class PipedriveError(RuntimeError):
 
 def api_token(explicit: str | None = None) -> str:
     """Resolve the API token, preferring an explicit argument."""
+    load_dotenv()  # same fallback the Google Ads credentials get
     token = (explicit or os.environ.get("PIPEDRIVE_API_TOKEN") or "").strip()
     if not token:
         raise PipedriveError(
@@ -45,6 +48,7 @@ def api_token(explicit: str | None = None) -> str:
 
 def api_host(explicit: str | None = None) -> str:
     """Company-specific host, e.g. https://viact.pipedrive.com, or the default."""
+    load_dotenv()
     host = (explicit or os.environ.get("PIPEDRIVE_HOST") or DEFAULT_HOST).strip()
     return host.rstrip("/")
 
