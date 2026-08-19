@@ -45,6 +45,10 @@ async def main() -> int:
                     help="name of the Pipedrive custom field holding the click id")
     ap.add_argument("--customer-id", default=None)
     ap.add_argument("--apply", action="store_true", help="actually upload")
+    ap.add_argument("--redact", action="store_true",
+                    help="print deal ids instead of titles, for logs others can read")
+    ap.add_argument("--diagnose", action="store_true",
+                    help="report the shape of the Pipedrive data and stop")
     args = ap.parse_args()
 
     if not args.conversion_action:
@@ -60,6 +64,19 @@ async def main() -> int:
     except PipedriveError as exc:
         print(f"Pipedrive: {exc}")
         return 1
+    if args.diagnose:
+        try:
+            shape = await pd.describe()
+        except PipedriveError as exc:
+            print(f"Pipedrive: {exc}")
+            return 1
+        finally:
+            await pd.aclose()
+        print("=== SHAPE OF THE PIPEDRIVE DATA (no deal contents) ===")
+        for key, value in shape.items():
+            print(f"  {key:<34} {value}")
+        return 0
+
     try:
         deals = await pd.deals(status=args.status, updated_since=since,
                               gclid_field=args.gclid_field)
@@ -77,14 +94,20 @@ async def main() -> int:
         if p.skip_reason:
             continue
         v = p.conversion.get("conversion_value")
+        label = "" if args.redact else p.title[:44]
         print(f"  deal {p.deal_id:<8} via {p.route:<6} {p.age_days:>3}d old  "
-              f"value {v if v is not None else '-':<8} {p.title[:44]}")
+              f"value {v if v is not None else '-':<8} {label}")
     if not result.ready:
         print("  nothing")
 
     print("\n=== SKIPPED (Google would reject or ignore these) ===")
-    for p in result.skipped():
-        print(f"  deal {p.deal_id:<8} {p.title[:40]:42} {p.skip_reason}")
+    if args.redact:
+        # One line per reason rather than per deal: the counts are the signal,
+        # and the titles are the company's pipeline.
+        print("  (titles hidden) see SUMMARY below for counts by reason")
+    else:
+        for p in result.skipped():
+            print(f"  deal {p.deal_id:<8} {p.title[:40]:42} {p.skip_reason}")
     if not result.skipped():
         print("  none")
 

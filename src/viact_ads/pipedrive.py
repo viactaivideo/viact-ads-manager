@@ -220,6 +220,38 @@ class PipedriveClient:
         return out
 
 
+    # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------
+    async def describe(self, sample: int = 20) -> dict[str, Any]:
+        """Report the *shape* of this account's deals, never their contents.
+
+        Deal titles carry client and tender names, so a diagnostic that dumps
+        rows is unusable anywhere the output might be read by someone outside
+        the company. This returns key names, value types and counts only, so
+        it is safe to print in a CI log.
+        """
+        payload = await self._get("/api/v2/deals", {"limit": min(int(sample), 500)})
+        rows = payload.get("data") or []
+        fields = await self.deal_fields()
+
+        interesting = sorted(
+            name for name in fields
+            if any(word in name for word in ("gclid", "click", "utm", "email", "source", "campaign"))
+        )
+        first = rows[0] if rows else {}
+        return {
+            "deals_sampled": len(rows),
+            "deal_keys": sorted(first.keys()),
+            "person_id_type": type(first.get("person_id")).__name__,
+            "custom_fields_present": sum(1 for r in rows if r.get("custom_fields")),
+            "with_person_id": sum(1 for r in rows if r.get("person_id")),
+            "email_found_by_current_code": sum(1 for r in rows if _first_email(r)),
+            "deal_field_names_worth_checking": interesting,
+            "total_deal_fields": len(fields),
+        }
+
+
 def _as_float(value: Any) -> float | None:
     try:
         return float(value)

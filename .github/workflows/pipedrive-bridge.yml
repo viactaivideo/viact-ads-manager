@@ -1,6 +1,9 @@
 # Runs the Pipedrive -> Google Ads offline conversion bridge on GitHub's
 # runners, which is the only place a repository secret is ever readable.
 #
+# Deal titles are never printed: this repository is public, which makes its
+# Actions logs public, and the titles are client and tender names.
+#
 # Preview is the default everywhere. A run uploads to Google only when it is
 # started by hand with "apply" ticked, or when the repository variable
 # PD_BRIDGE_APPLY is set to "true". Left alone, this job contacts Pipedrive,
@@ -22,6 +25,10 @@ on:
         default: all
       apply:
         description: "Upload to Google Ads (leave off for a preview)"
+        type: boolean
+        default: false
+      diagnose:
+        description: "Report the shape of the Pipedrive data and stop"
         type: boolean
         default: false
   schedule:
@@ -81,9 +88,16 @@ jobs:
           DAYS: ${{ inputs.days || 14 }}
           STATUS: ${{ inputs.status || 'all' }}
           WANTS_APPLY: ${{ inputs.apply }}
+          DIAGNOSE: ${{ inputs.diagnose }}
           SCHEDULED_APPLY: ${{ vars.PD_BRIDGE_APPLY }}
         run: |
-          flags="--days $DAYS"
+          # This repository is public, so its Actions logs are public too.
+          # --redact keeps deal titles - client and tender names - out of them.
+          flags="--days $DAYS --redact"
+          if [ "$DIAGNOSE" = "true" ]; then
+            python scripts/pipedrive_to_google_ads.py --diagnose
+            exit $?
+          fi
           [ "$STATUS" != "all" ] && flags="$flags --status $STATUS"
           if [ "$WANTS_APPLY" = "true" ] || \
              { [ "${{ github.event_name }}" = "schedule" ] && [ "$SCHEDULED_APPLY" = "true" ]; }; then
