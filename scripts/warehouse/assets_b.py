@@ -73,7 +73,7 @@ AG["Warehouse Safety Platform"]={
  "AI Video Analytics For DCs","Multi-Site Safety Control","Enterprise Warehouse Safety",
  "Forklift, PPE & Dock In One","Works With Existing CCTV","Roll Out Across Every Site",
  "Built For 3PL Operators","Safety Data In One Place","Replace Manual Safety Checks",
- "For Cold Storage & Fulfilment","Central HSE Dashboard","Evidence For Every Incident",
+ "For Cold Storage & Fulfilment","Deploy Across Continents","Beyond PPE And Near Misses",
  "Book A Warehouse Demo","Talk To A Safety Engineer"],
 "descriptions":[
  "One AI Layer Over Your Existing Cameras Covering Forklifts, PPE, Docks And Zones.",
