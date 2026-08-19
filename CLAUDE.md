@@ -36,3 +36,10 @@ changes nothing.
 
 Lost deals upload at value 0 rather than being withheld. That is what teaches
 bidding which sources to stop buying.
+
+Pipedrive is not reachable from the Claude Code session sandbox: the egress
+policy rejects both `api.pipedrive.com` and `viact.pipedrive.com`. The bridge
+therefore runs from `.github/workflows/pipedrive-bridge.yml`, on GitHub's
+runners, reading the token from a repository secret. That workflow previews by
+default and only uploads when started by hand with `apply` ticked, or when the
+repository variable `PD_BRIDGE_APPLY` is `true`.

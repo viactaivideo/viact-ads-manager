@@ -1,0 +1,95 @@
+# Runs the Pipedrive -> Google Ads offline conversion bridge on GitHub's
+# runners, which is the only place a repository secret is ever readable.
+#
+# Preview is the default everywhere. A run uploads to Google only when it is
+# started by hand with "apply" ticked, or when the repository variable
+# PD_BRIDGE_APPLY is set to "true". Left alone, this job contacts Pipedrive,
+# prints what it would send, and changes nothing in the ad account.
+
+name: Pipedrive bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How many days of deals to read"
+        type: number
+        default: 14
+      status:
+        description: "Deal status to read"
+        type: choice
+        options: [all, won, lost, open]
+        default: all
+      apply:
+        description: "Upload to Google Ads (leave off for a preview)"
+        type: boolean
+        default: false
+  schedule:
+    # 02:00 UTC = 10:00 Hong Kong, after the previous day has closed out.
+    - cron: "0 2 * * *"
+
+# One bridge run at a time. Overlapping runs would re-read the same deals.
+concurrency:
+  group: pipedrive-bridge
+  cancel-in-progress: false
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the project
+        run: pip install -e .
+
+      - name: Check the credentials arrived
+        env:
+          PIPEDRIVE_API_TOKEN: ${{ secrets.PIPEDRIVE_API_TOKEN }}
+          GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+          GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+          GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+          GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+        run: |
+          missing=""
+          for name in PIPEDRIVE_API_TOKEN GOOGLE_ADS_DEVELOPER_TOKEN \
+                      GOOGLE_ADS_CLIENT_ID GOOGLE_ADS_CLIENT_SECRET \
+                      GOOGLE_ADS_REFRESH_TOKEN; do
+            [ -z "${!name}" ] && missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "These secrets are missing or empty:$missing"
+            echo "Add them under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "All required secrets are present."
+
+      - name: Run the bridge
+        env:
+          PIPEDRIVE_API_TOKEN: ${{ secrets.PIPEDRIVE_API_TOKEN }}
+          PIPEDRIVE_HOST: https://viact.pipedrive.com
+          GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+          GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+          GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+          GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+          GOOGLE_ADS_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
+          GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_ADS_LOGIN_CUSTOMER_ID }}
+          PD_CONVERSION_ACTION_ID: "7726452125"
+          DAYS: ${{ inputs.days || 14 }}
+          STATUS: ${{ inputs.status || 'all' }}
+          WANTS_APPLY: ${{ inputs.apply }}
+          SCHEDULED_APPLY: ${{ vars.PD_BRIDGE_APPLY }}
+        run: |
+          flags="--days $DAYS"
+          [ "$STATUS" != "all" ] && flags="$flags --status $STATUS"
+          if [ "$WANTS_APPLY" = "true" ] || \
+             { [ "${{ github.event_name }}" = "schedule" ] && [ "$SCHEDULED_APPLY" = "true" ]; }; then
+            echo "Mode: APPLY - conversions will be sent to Google Ads."
+            flags="$flags --apply"
+          else
+            echo "Mode: PREVIEW - nothing will be sent to Google Ads."
+          fi
+          python scripts/pipedrive_to_google_ads.py $flags
