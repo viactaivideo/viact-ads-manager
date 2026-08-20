@@ -16,9 +16,10 @@ from .config import Config
 
 _CAMEL_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
 
-# Most mutate services accept partialFailure; AssetGroupService rejects the
-# field outright ("Unknown name partialFailure"), so it must be omitted there.
-NO_PARTIAL_FAILURE = frozenset({"asset_group"})
+# Most mutate services accept partialFailure. These reject the field outright
+# ("Unknown name partialFailure" / "Cannot find field"), so it must be omitted:
+# a request carrying it fails before any row is examined.
+NO_PARTIAL_FAILURE = frozenset({"asset_group", "custom_audience", "audience"})
 
 
 class GoogleAdsError(RuntimeError):

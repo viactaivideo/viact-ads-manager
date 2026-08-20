@@ -46,6 +46,11 @@ SERVICES = {
     # only: a signal's text cannot be edited, so changing one means removing
     # the old signal and creating a new one.
     "asset_group_signal": "assetGroupSignals",
+    # Audiences are shared library objects: one audience is often referenced by
+    # several asset groups across campaigns, so editing one in place changes
+    # every campaign that points at it. Re-point a signal instead.
+    "audience": "audiences",
+    "custom_audience": "customAudiences",
     # Extension assets (sitelinks, callouts, snippets) attach at three levels.
     # The link is what carries the status, so detaching one is a remove on the
     # link, never on the shared asset it points at.
