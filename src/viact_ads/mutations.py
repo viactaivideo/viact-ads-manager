@@ -42,6 +42,10 @@ SERVICES = {
     # than editing text in place.
     "asset": "assets",
     "asset_group_asset": "assetGroupAssets",
+    # Performance Max audience and search-theme signals. Create and remove
+    # only: a signal's text cannot be edited, so changing one means removing
+    # the old signal and creating a new one.
+    "asset_group_signal": "assetGroupSignals",
     # Extension assets (sitelinks, callouts, snippets) attach at three levels.
     # The link is what carries the status, so detaching one is a remove on the
     # link, never on the shared asset it points at.
