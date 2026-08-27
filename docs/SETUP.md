@@ -1,5 +1,22 @@
 # Connecting Google Ads directly
 
+## Google Cloud project (this account)
+
+The OAuth client, developer-token app, GA4 Data API and Tag Manager API for this
+account all run through **one** Google Cloud project:
+
+| Field | Value |
+|---|---|
+| Project name | `viact-ads-manager` |
+| Project number | `783824161972` |
+| Registered under | `rakesh.mishra@viact.ai` |
+
+The OAuth client ID starts with `783824161972-` accordingly. Related IDs (Google
+Ads, not Cloud): manager MCC `776-228-9364`, client account `376-758-8103`, GA4
+property `252020859`, GTM container `GTM-MB6W3RC`.
+
+---
+
 This is the full credential walkthrough. There are four things to collect:
 
 | # | Credential | Comes from | Time |
